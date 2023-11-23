@@ -1,0 +1,240 @@
+### Run on Integrated Development Environment (IDE) ###
+git clone https://github.com/arora-r/chatapp-with-voice-and-openai-outline.git
+mv chatapp-with-voice-and-openai-outline chatapp-with-voice-and-openai
+cd chatapp-with-voice-and-openai
+
+### Run on Python ###
+
+import base64
+import json
+from flask import Flask, render_template, request
+from worker import speech_to_text, text_to_speech, openai_process_message
+from flask_cors import CORS
+import os
+
+app = Flask(__name__)
+cors = CORS(app, resources={r"/*": {"origins": "*"}})
+
+
+@app.route('/', methods=['GET'])
+def index():
+    return render_template('index.html')
+
+
+@app.route('/speech-to-text', methods=['POST'])
+def speech_to_text_route():
+    return None
+
+
+@app.route('/process-message', methods=['POST'])
+def process_prompt_route():
+    response = app.response_class(
+        response=json.dumps({"openaiResponseText": None, "openaiResponseSpeech": None}),
+        status=200,
+        mimetype='application/json'
+    )
+    return response
+
+
+@app.route('/', methods=['GET'])
+def index():
+    return render_template('index.html')
+
+
+if __name__ == "__main__":
+    app.run(port=8000, host='0.0.0.0')
+##########
+
+docker build . -t voice-chatapp-powered-by-openai
+docker run -p 8000:8000 voice-chatapp-powered-by-openai
+
+base_url = "https://sn-watson-stt.labs.skills.network"
+
+curl https://sn-watson-stt.labs.skills.network/speech-to-text/api/v1/models
+
+{
+   "models": [
+      {
+         "name": "en-US_Multimedia",
+         "language": "en-US",
+         "description": "US English multimedia model for broadband audio (16kHz or more)",
+          ...
+      },
+      {
+         "name": "fr-FR_Multimedia",
+         "language": "fr-FR",
+         "description": "French multimedia model for broadband audio (16kHz or more)",
+          ...
+      }
+   ]
+}
+
+base_url = "https://sn-watson-tts.labs.skills.network"
+
+{
+   "voices": [
+      {
+         "name": "en-US_EmilyV3Voice",
+         "language": "en-US",
+         "gender": "female",
+         "description": "Emily: American English female voice. Dnn technology.",
+         ...
+      },
+      {
+         "name": "en-GB_JamesV3Voice",
+         "language": "en-GB",
+         "gender": "male",
+         "description": "James: British English male voice. Dnn technology.",
+         ...
+      },
+      {
+         "name": "en-US_MichaelV3Voice",
+         "language": "en-US",
+         "gender": "male",
+         "description": "Michael: American English male voice. Dnn technology.",
+         ...
+      },
+      {
+         "name": "fr-CA_LouiseV3Voice",
+         "language": "fr-CA",
+         "gender": "female",
+         "description": "Louise: French Canadian female voice. Dnn technology.",
+         ....
+      },
+      ...
+   ]
+}
+
+import requests
+
+def speech_to_text(audio_binary):
+
+    # Set up Watson Speech to Text HTTP Api url
+    base_url = '...'
+    api_url = base_url+'/speech-to-text/api/v1/recognize'
+
+    # Set up parameters for our HTTP reqeust
+    params = {
+        'model': 'en-US_Multimedia',
+    }
+
+    # Set up the body of our HTTP request
+    body = audio_binary
+
+    # Send a HTTP Post request
+    response = requests.post(api_url, params=params, data=audio_binary).json()
+
+    # Parse the response to get our transcribed text
+    text = 'null'
+    while bool(response.get('results')):
+        print('speech to text response:', response)
+        text = response.get('results').pop().get('alternatives').pop().get('transcript')
+        print('recognised text: ', text)
+        return text
+
+{
+  "response": {
+    "results": {
+      "alternatives": {
+        "transcript": "Recognised text from your speech"
+      }
+    }
+  }
+}
+
+openai.api_key = "..."
+
+
+def openai_process_message(user_message):
+    # Set the prompt for OpenAI Api
+    prompt = "\"Act like a personal assistant. You can respond to questions, translate sentences, summarize news, and give recommendations. " + user_message + "\""
+    # Call the OpenAI Api to process our prompt
+    openai_response = openai.Completion.create(model="text-davinci-003", prompt=prompt,max_tokens=4000)
+    print("openai response:", openai_response)
+    # Parse the response to get the response text for our prompt
+    response_text = openai_response.choices[0].text
+    return response_text
+
+{
+  "choices": [
+      {"text": "The model's answer to our prompt"},
+      ...,
+      ...
+    ]
+}
+
+def text_to_speech(text, voice=""):
+    # Set up Watson Text to Speech HTTP Api url
+    base_url = '...'
+    api_url = base_url + '/text-to-speech/api/v1/synthesize?output=output_text.wav'
+
+    # Adding voice parameter in api_url if the user has selected a preferred voice
+    if voice != "" and voice != "default":
+        api_url += "&voice=" + voice
+
+    # Set the headers for our HTTP request
+    headers = {
+        'Accept': 'audio/wav',
+        'Content-Type': 'application/json',
+    }
+
+    # Set the body of our HTTP request
+    json_data = {
+        'text': text,
+    }
+
+    # Send a HTTP Post reqeust to Watson Text to Speech Service
+    response = requests.post(api_url, headers=headers, json=json_data)
+    print('text to speech response:', response)
+    return response.content
+
+{
+  "response": {
+        content: The Audio data for the processed text to speech
+    }
+  }
+}
+
+from worker import speech_to_text, text_to_speech, openai_process_message
+
+@app.route('/speech-to-text', methods=['POST'])
+def speech_to_text_route():
+    print("processing speech to text")
+    audio_binary = request.data # Get the user's speech from their reqeust
+    text = speech_to_text(audio_binary) # Call speech_to_text function to transcribe the speech
+
+    # Return the response back to user in JSON format
+    response = app.response_class(
+        response=json.dumps({'text': text}),
+        status=200,
+        mimetype='application/json'
+    )
+    print(response)
+    print(response.data)
+    return response
+
+docker build . -t voice-chatapp-powered-by-openai
+docker run -p 8000:8000 voice-chatapp-powered-by-openai
+
+ibmcloud ce application create --name speech-to-text --env ACCEPT_LICENSE=true --image us.icr.io/sn-labsassets/speech-standalone:latest --port 1080 --registry-secret icr-secret --visibility project
+
+ibmcloud ce application create --name text-to-speech --env ACCEPT_LICENSE=true --image us.icr.io/sn-labsassets/tts-standalone:latest --port 1080 --registry-secret icr-secret --visibility project
+
+ibmcloud ce application create --name personal-assistant --build-source . --build-context-dir . --image us.icr.io/${SN_ICR_NAMESPACE}/personal-assistant:latest --registry-secret icr-secret --port 8000 --visibility project
+
+ibmcloud login -u USERNAME
+IBM_ENTITLEMENT_KEY="YOUR_IBM_ENTITLEMENT_KEY"
+
+echo $IBM_ENTITLEMENT_KEY | docker login -u cp --password-stdin cp.icr.io
+
+cd /home/project/chatapp-with-voice-and-openai/models/stt
+docker build ./speech-to-text -t stt-standalone:latest
+cd /home/project/chatapp-with-voice-and-openai/models/tts
+docker build ./text-to-speech -t tts-standalone:latest
+
+NAMESPACE=personal-assistant
+
+ibmcloud cr region-set global
+ibmcloud cr namespace-add ${NAMESPACE}
+ibmcloud cr login
+
